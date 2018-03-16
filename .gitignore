@@ -114,7 +114,7 @@ venv.bak/
 !.vscode/launch.json
 !.vscode/extensions.json
 .history
-.DS_Store
 *.txt
 *.csv
+.DS_Store
 # End of https://www.gitignore.io/api/python,jupyternotebook,visualstudiocode
