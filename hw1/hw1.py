@@ -3,15 +3,15 @@
 
 # ## 103590450 四資四 馬茂源
 
-# In[44]:
+# In[1]:
 
 
 from pyspark import SparkConf, SparkContext, SQLContext
-#from pyspark.sql.functions import mean, max as max_, min as min_, stddev, count
-import os, math
+from pyspark.sql.utils import AnalysisException
+import os, math, time
 
 
-# In[45]:
+# In[2]:
 
 
 conf = (SparkConf()
@@ -20,7 +20,7 @@ conf = (SparkConf()
         .setAppName("hw1"))
 
 
-# In[46]:
+# In[3]:
 
 
 try:
@@ -30,13 +30,16 @@ except ValueError:
     pass
 
 
-# In[47]:
+# In[4]:
 
 
-data = sql_sc.read.csv('./household_power_consumption.csv', sep=';', header=True)
+try:
+    data = sql_sc.read.csv('./household_power_consumption.txt', sep=';', header=True)
+except AnalysisException:
+    data = sql_sc.read.csv('hdfs:///bdm/hw1/household_power_consumption.txt', sep=';', header=True)
 
 
-# In[48]:
+# In[5]:
 
 
 data = data.drop('Date', 'Time', 'Sub_metering_1', 
@@ -44,7 +47,7 @@ data = data.drop('Date', 'Time', 'Sub_metering_1',
         'Sub_metering_3')
 
 
-# In[49]:
+# In[6]:
 
 
 data = (data.withColumn('Global_active_power', data.Global_active_power.cast('float'))
@@ -53,114 +56,111 @@ data = (data.withColumn('Global_active_power', data.Global_active_power.cast('fl
         .withColumn('Global_intensity', data.Global_intensity.cast('float')))
 
 
-# In[50]:
+# In[7]:
 
 
 data = data.dropna()
 
 
 # 1. Output the **minimum**, **maximum**, and **count** of the columns:`Global_active_power`, `Global_reactive_power`, `Voltage`, and `Global_intensity`
-# 2. Output the **mean** and **standard deviation** of these columns
-# 
 
-# In[51]:
+# In[8]:
 
 
 features = ['Global_active_power', 'Global_reactive_power', 'Voltage', 'Global_intensity']
 
 
-# In[52]:
-
-
-# def get_count(df, feature):
-#     return df.select(feature).count()
-# def get_minmax(df, feature):
-#     return (data.select(feature)
-#             .rdd
-#             .sortBy(lambda x: x, ascending=False))
-
-
-# In[53]:
-
-
-count = data.count()
-
-
-# In[54]:
+# In[9]:
 
 
 summary = {k:{} for k in ['min', 'max', 'mean', 'stddev', 'count']}
-summary['count'] = {f:count for f in features}
 
 
-# In[55]:
+# In[10]:
 
 
-max__ = (data.rdd.map(lambda x: (x.Global_active_power, 
-                        x.Global_reactive_power,
-                        x.Voltage,
-                        x.Global_intensity))
-.reduce(lambda x, y: tuple(max(p) for p in zip(x, y))))
-min__ = (data.rdd.map(lambda x: (x.Global_active_power, 
-                        x.Global_reactive_power,
-                        x.Voltage,
-                        x.Global_intensity))
-.reduce(lambda x, y: tuple(min(p) for p in zip(x, y))))
-for i, f in enumerate(features):
-    summary['max'][f] = max__[i]
-    summary['min'][f] = min__[i]
+# count = data.count()
+# summary['count'] = {f:count for f in features}
 
 
-# In[56]:
+# In[11]:
 
 
-sum_ = (data.rdd.map(lambda x: (x.Global_active_power, 
-                        x.Global_reactive_power,
-                        x.Voltage,
-                        x.Global_intensity))
-        .reduce(lambda x,y: tuple(x_n+y_n for x_n, y_n in zip(x, y))))
-for i, f in enumerate(features):
-    summary['mean'][f] = sum_[i]/summary['count'][f]
+# max__ = (data.rdd.map(lambda x: (x.Global_active_power, 
+#                         x.Global_reactive_power,
+#                         x.Voltage,
+#                         x.Global_intensity))
+# .reduce(lambda x, y: tuple(max(p) for p in zip(x, y))))
+# min__ = (data.rdd.map(lambda x: (x.Global_active_power, 
+#                         x.Global_reactive_power,
+#                         x.Voltage,
+#                         x.Global_intensity))
+# .reduce(lambda x, y: tuple(min(p) for p in zip(x, y))))
+# for i, f in enumerate(features):
+#     summary['max'][f] = max__[i]
+#     summary['min'][f] = min__[i]
 
 
-# In[57]:
+# 2 . Output the **mean** and **standard deviation** of these columns
+# 
+
+# In[12]:
 
 
-temp = (data.rdd.map(lambda x: ((x.Global_active_power-summary['mean']['Global_active_power'])**2, 
-                        (x.Global_reactive_power-summary['mean']['Global_reactive_power'])**2,
-                        (x.Voltage-summary['mean']['Voltage'])**2,
-                        (x.Global_intensity-summary['mean']['Global_intensity'])**2))
-        .reduce(lambda x, y: tuple(x_n+y_n for x_n, y_n in zip(x, y))))
-
-for i, f in enumerate(features):
-    summary['stddev'][f] = math.sqrt(temp[i] / (summary['count'][f]-1)) 
-
-
-# In[59]:
+# sum_ = (data.rdd.map(lambda x: (x.Global_active_power, 
+#                         x.Global_reactive_power,
+#                         x.Voltage,
+#                         x.Global_intensity))
+#         .reduce(lambda x,y: tuple(x_n+y_n for x_n, y_n in zip(x, y))))
+# for i, f in enumerate(features):
+#     summary['mean'][f] = sum_[i]/summary['count'][f]
 
 
-summary
+# In[13]:
 
 
-# In[18]:
+# temp = (data.rdd.map(lambda x: ((x.Global_active_power-summary['mean']['Global_active_power'])**2, 
+#                         (x.Global_reactive_power-summary['mean']['Global_reactive_power'])**2,
+#                         (x.Voltage-summary['mean']['Voltage'])**2,
+#                         (x.Global_intensity-summary['mean']['Global_intensity'])**2))
+#         .reduce(lambda x, y: tuple(x_n+y_n for x_n, y_n in zip(x, y))))
+
+# for i, f in enumerate(features):
+#     summary['stddev'][f] = math.sqrt(temp[i] / (summary['count'][f]-1)) 
 
 
-# summary = data.select(features).describe()
-# summary.show()
-# +-------+-------------------+---------------------+------------------+-----------------+
-# |summary|Global_active_power|Global_reactive_power|           Voltage| Global_intensity|
-# +-------+-------------------+---------------------+------------------+-----------------+
-# |  count|            2049280|              2049280|           2049280|          2049280|
-# |   mean| 1.0916150366540094|   0.1237144765251571|240.83985796672414|4.627759313004169|
-# | stddev| 1.0572941611180013|  0.11272197958641254|  3.23998666120589|4.444396258981289|
-# |    min|              0.076|                  0.0|             223.2|              0.2|
-# |    max|             11.122|                 1.39|            254.15|             48.4|
-# +-------+-------------------+---------------------+------------------+-----------------+
+# In[14]:
+
+
+t0 = time.time()
+
+
+# In[15]:
+
+
+descr = data.select(features).describe()
+descr = (descr.withColumn('Global_active_power', descr['Global_active_power'].cast('float'))
+            .withColumn('Global_reactive_power', descr['Global_reactive_power'].cast('float'))
+            .withColumn('Voltage', descr['Voltage'].cast('float'))
+            .withColumn('Global_intensity', descr['Global_intensity'].cast('float')))
+for r in descr.collect():
+    state_name = r.summary
+    r = r.asDict()
+    r.pop('summary')
+    summary[state_name] = r
+
+
+# In[16]:
+
+
+for i in ['min', 'max', 'count', 'mean', 'stddev']:
+    print('%6s: %s'%(i, summary[i]))
+print("finding 'min', 'max', 'count', 'mean', 'stddev' cost:%.3fs"%(time.time()-t0))
 
 
 # 3 . Perform **min-max normalization** on the columns to generate normalized output
 
-# In[20]:
+# In[17]:
 
 
 for f in features:
@@ -170,13 +170,18 @@ for f in features:
                      (data[f] - min_) / (max_ - min_)))
 
 
-# In[21]:
+# In[18]:
 
 
-data.select(['norm_'+f for f in features]).show()
+(data.select(['norm_'+f for f in features])
+ .repartition(1)
+ .write.mode("overwrite")
+ .format("com.databricks.spark.csv")
+ .option("header", "true")
+ .save("norm.csv"))
 
 
-# In[22]:
+# In[19]:
 
 
 sc.stop()
