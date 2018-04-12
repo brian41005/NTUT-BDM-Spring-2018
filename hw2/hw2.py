@@ -3,6 +3,12 @@
 
 # # 103590450 四資四 馬茂源
 
+# ![](1.png)
+# ![](2.png)
+# ![](3.png)
+# ![](4.png)
+# ![](5.png)
+
 # In[1]:
 
 
@@ -443,35 +449,36 @@ task3_output = []
 
 
 sum_of_score = (news_data.select('SentimentScore', 'topic')
-               .rdd
-               .map(lambda r: (r['topic'], r['SentimentScore']))
-               .reduceByKey(lambda a, b: a + b)
-               .collect())
+                .rdd
+                .map(lambda r: (r['topic'], r['SentimentScore']))
+                .groupByKey()
+                .map(lambda topic: (topic[0], list(topic[1])))
+                .map(lambda topic: (topic[0], np.sum(topic[1]), np.mean(topic[1])))
+                .collect())
 
 
 # In[42]:
 
 
 task3_output.append('[sum sentiment score of each topic]')
-for topic_row in sum_of_score:
-    task3_output.append('{:>10s}, {:.3f}'.format(*topic_row))
+for topic, sum_, avg in sum_of_score:
+    #print('{:>10s}, {:.3f}'.format(*topic_row))
+    task3_output.append('{:>10s}, {:.3f}'.format(topic, sum_))
 
 
 # In[43]:
 
 
-count = news_data.count()
-avg_of_score = (sc.parallelize(sum_of_score)
-               .map(lambda s: (s[0], s[1] / count))
-               .collect())
+task3_output.append('[avg sentiment score of each topic]')
+for topic, sum_, avg in sum_of_score:
+    task3_output.append('{:>10s}, {:.6f}'.format(topic, avg))
 
 
 # In[44]:
 
 
-task3_output.append('[avg sentiment score of each topic]')
-for topic_row in avg_of_score:
-    task3_output.append('{:>10s}, {:.6f}'.format(*topic_row))
+task3_file.writelines(['{}\n'.format(r) for r in task3_output])
+task3_file.close()
 
 
 # ### From subtask (1), for the top-100 frequent words per topic in titles and headlines, calculate their co-occurrence matrices (100x100), respectively. Each entry in the matrix will contain the co-occurrence frequency in all news titles and headlines, respectively
