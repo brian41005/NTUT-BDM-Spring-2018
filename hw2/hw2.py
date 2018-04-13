@@ -16,7 +16,7 @@ from pyspark import SparkConf, SparkContext, SQLContext
 from pyspark.sql.utils import AnalysisException
 from pyspark.ml.feature import RegexTokenizer
 from pyspark.sql.functions import udf, mean
-from pyspark.sql.types import StringType, StructType, StructField
+from pyspark.sql.types import StringType, StructType, StructField, FloatType
 import pandas as pd
 import numpy as np
 import os, math, time
@@ -146,21 +146,27 @@ news = read_csv(files['news'])
 # In[10]:
 
 
-news = news.dropna()
+news.count()
 
 
 # In[11]:
 
 
-news_data = news.select('title', 
-                        'headline', 
-                        'topic', 
-                        'publishDate',
-                        'SentimentTitle', 
-                        'SentimentHeadline')
+news = news.withColumn('SentimentScore', (news.SentimentTitle+news.SentimentHeadline))
 
 
 # In[12]:
+
+
+news_data = (news.dropna()
+                .select('title', 
+                        'headline', 
+                        'topic', 
+                        'publishDate',
+                        'SentimentScore'))
+
+
+# In[13]:
 
 
 def wordTokenizer(data, columns):
@@ -174,7 +180,7 @@ def wordTokenizer(data, columns):
     return data
 
 
-# In[13]:
+# In[14]:
 
 
 col =  ['title', 'headline']
@@ -183,11 +189,10 @@ news_data = news_data.select('title_tokens',
                              'headline_tokens', 
                              'topic',  
                              'publishDate',
-                             'SentimentTitle', 
-                             'SentimentHeadline')
+                             'SentimentScore')
 
 
-# In[14]:
+# In[15]:
 
 
 news_data = news_data.withColumn('publishDate', 
@@ -195,27 +200,34 @@ news_data = news_data.withColumn('publishDate',
                                  (news_data.publishDate))
 
 
-# In[15]:
-
-
-news_data = news_data.withColumn('SentimentScore', (news_data.SentimentTitle+news_data.SentimentHeadline))
-news_data = news_data.select('title_tokens', 
-                             'headline_tokens', 
-                             'topic',  
-                             'publishDate',
-                             'SentimentScore')                             
-
-
 # In[16]:
 
 
-news_data = news_data.dropna()
-news_data.show()
+news_data.count()
+
+
+# In[17]:
+
+
+news.count()
+
+
+# In[18]:
+
+
+# news_data = news_data.dropna()
+# news_data.show()
+
+
+# In[19]:
+
+
+news_data.count()
 
 
 # ### In news data, count the words in two fields: ‘Title’ and ‘Headline’ respectively, and list the most frequent words according to the term frequency in descending order, in total, per day, and per topic, respectively
 
-# In[17]:
+# In[20]:
 
 
 def word_count_total(data, column, n=10):
@@ -228,7 +240,7 @@ def word_count_total(data, column, n=10):
             .take(n))
 
 
-# In[18]:
+# In[21]:
 
 
 task1_file = open('result/task1/output.txt', 'w', encoding='utf-8', newline='\n')
@@ -237,7 +249,7 @@ task1_output = []
 
 # #### In total
 
-# In[19]:
+# In[22]:
 
 
 task1_output.append('[title top-frequent words in total]')
@@ -245,7 +257,7 @@ for r in word_count_total(news_data, 'title_tokens', n=100):
     task1_output.append(r)
 
 
-# In[20]:
+# In[23]:
 
 
 task1_output.append('\n[headline top-frequent words in total]')
@@ -255,7 +267,7 @@ for r in word_count_total(news_data, 'headline_tokens', n=100):
 
 #  #### per day
 
-# In[21]:
+# In[24]:
 
 
 def sort(tokens):
@@ -263,7 +275,7 @@ def sort(tokens):
     return sorted(tokens, key=lambda x: x[1], reverse=True)[:take]
 
 
-# In[22]:
+# In[25]:
 
 
 def word_count_per(data, column, per_col, take=-1):
@@ -290,7 +302,7 @@ def word_count_per(data, column, per_col, take=-1):
         return rdd.take(take)
 
 
-# In[23]:
+# In[26]:
 
 
 task1_output.append('\n[title top-frequent words per day]')
@@ -298,7 +310,7 @@ for r in sorted(word_count_per(news_data, 'title_tokens', 'publishDate'), key=la
     task1_output.append(r)
 
 
-# In[24]:
+# In[27]:
 
 
 task1_output.append('\n[headline top-frequent words per day]')
@@ -308,7 +320,7 @@ for r in sorted(word_count_per(news_data, 'headline_tokens', 'publishDate'), key
 
 # #### per topic
 
-# In[25]:
+# In[28]:
 
 
 task1_output.append('\n[title top-frequent words per topic]')
@@ -316,7 +328,7 @@ for r in word_count_per(news_data, 'title_tokens', 'topic'):
     task1_output.append(r)
 
 
-# In[26]:
+# In[29]:
 
 
 task1_output.append('\n[headline top-frequent words per topic]')
@@ -324,7 +336,7 @@ for r in word_count_per(news_data, 'headline_tokens', 'topic'):
     task1_output.append(r)
 
 
-# In[27]:
+# In[30]:
 
 
 task1_file.writelines(['{}\n'.format(r) for r in task1_output])
@@ -333,7 +345,7 @@ task1_file.close()
 
 # ### In social feedback data, calculate the average popularity of each news by hour, and by day, respectively (for each platform)
 
-# In[28]:
+# In[31]:
 
 
 def create_social_data(data, files):
@@ -346,13 +358,13 @@ def create_social_data(data, files):
     return data
 
 
-# In[29]:
+# In[32]:
 
 
 fb_social_data = google_social_data = linkedin_social_data = None 
 
 
-# In[30]:
+# In[33]:
 
 
 fb_social_data = create_social_data(fb_social_data, files['fb'])
@@ -360,7 +372,7 @@ google_social_data = create_social_data(google_social_data, files['google'])
 linkedin_social_data = create_social_data(linkedin_social_data, files['linkedin'])
 
 
-# In[31]:
+# In[34]:
 
 
 fb_social_data = fb_social_data.dropna()
@@ -368,7 +380,7 @@ google_social_data = google_social_data.dropna()
 linkedin_social_data = linkedin_social_data.dropna()
 
 
-# In[32]:
+# In[35]:
 
 
 def get_avg(seq):
@@ -376,35 +388,35 @@ def get_avg(seq):
     return sum_/48, sum_/2
 
 
-# In[33]:
+# In[36]:
 
 
 def avg_popu(data, by=3):
-    return (data
-           .rdd
-           .map(lambda r: (r['IDLink'],  get_avg(r[1:])))
-           .collect())
+    return (data.rdd
+            .map(lambda r: (r['IDLink'],  get_avg(r[1:])))
+            .sortByKey()
+            .collect())
 
 
-# In[34]:
+# In[37]:
 
 
 fb_avg_by_hour_and_day = avg_popu(fb_social_data)
 
 
-# In[35]:
+# In[38]:
 
 
 google_avg_by_hour_and_day = avg_popu(google_social_data)
 
 
-# In[36]:
+# In[39]:
 
 
 linkedin_avg_by_hour_and_day = avg_popu(linkedin_social_data, by=3)
 
 
-# In[37]:
+# In[40]:
 
 
 avg_popularity = {'fb':fb_avg_by_hour_and_day,
@@ -412,7 +424,7 @@ avg_popularity = {'fb':fb_avg_by_hour_and_day,
                  'linkedin':linkedin_avg_by_hour_and_day}
 
 
-# In[38]:
+# In[41]:
 
 
 def save_csv(file_name, data):
@@ -424,7 +436,7 @@ def save_csv(file_name, data):
         writer.writerows(data)
 
 
-# In[39]:
+# In[42]:
 
 
 for platform, data in avg_popularity.items():
@@ -443,17 +455,17 @@ for platform, data in avg_popularity.items():
 
 # ###  In news data, calculate the sum and average sentiment score of each topic, respectively
 
-# In[40]:
+# In[43]:
 
 
 task3_file = open('result/task3/output.txt', 'w', encoding='utf-8', newline='\n')
 task3_output = []
 
 
-# In[41]:
+# In[44]:
 
 
-sum_of_score = (news_data.select('SentimentScore', 'topic')
+sum_of_score = (news.select('SentimentScore', 'topic')
                 .rdd
                 .map(lambda r: (r['topic'], (r['SentimentScore'], 1)))
                 .reduceByKey(lambda a, b: (a[0]+b[0], a[1]+b[1]))
@@ -465,16 +477,16 @@ sum_of_score = (news_data.select('SentimentScore', 'topic')
                 .collect())
 
 
-# In[42]:
+# In[45]:
 
 
 task3_output.append('[sum sentiment score of each topic]')
 for topic, sum_, avg in sum_of_score:
     print('{:10s}, {:.3f}, {:.6f}'.format(topic, sum_, avg))
-    task3_output.append('{:>10s}, {:.3f}'.format(topic, sum_))
+    task3_output.append('{:10s}, {:.3f}'.format(topic, sum_))
 
 
-# In[43]:
+# In[46]:
 
 
 task3_output.append('[avg sentiment score of each topic]')
@@ -482,7 +494,7 @@ for topic, sum_, avg in sum_of_score:
     task3_output.append('{:>10s}, {:.6f}'.format(topic, avg))
 
 
-# In[44]:
+# In[47]:
 
 
 task3_file.writelines(['{}\n'.format(r) for r in task3_output])
@@ -491,7 +503,7 @@ task3_file.close()
 
 # ### From subtask (1), for the top-100 frequent words per topic in titles and headlines, calculate their co-occurrence matrices (100x100), respectively. Each entry in the matrix will contain the co-occurrence frequency in all news titles and headlines, respectively
 
-# In[45]:
+# In[48]:
 
 
 fw_all = {'title_tokens':{topic:[w[0] for w in top] 
@@ -500,14 +512,14 @@ fw_all = {'title_tokens':{topic:[w[0] for w in top]
                           for topic, top in word_count_per(news_data, 'headline_tokens', 'topic')}}
 
 
-# In[46]:
+# In[49]:
 
 
 def counter(vocabulary, tokens):
     return  [int(tokens.count(v) > 0) for v in vocabulary]
 
 
-# In[47]:
+# In[50]:
 
 
 for col_name, v in fw_all.items():
@@ -526,7 +538,7 @@ for col_name, v in fw_all.items():
         df.to_csv('result/task4/{}_{}_matrix.csv'.format(col_name, topic))
 
 
-# In[48]:
+# In[51]:
 
 
 print('cost {:.2f} minutes'.format((time.time()-t0)/60))
