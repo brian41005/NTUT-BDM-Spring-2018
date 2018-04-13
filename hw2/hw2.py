@@ -198,7 +198,7 @@ news_data = news_data.withColumn('publishDate',
 # In[15]:
 
 
-news_data = news_data.withColumn('SentimentScore', (news_data.SentimentTitle+news_data.SentimentHeadline)/2)
+news_data = news_data.withColumn('SentimentScore', (news_data.SentimentTitle+news_data.SentimentHeadline))
 news_data = news_data.select('title_tokens', 
                              'headline_tokens', 
                              'topic',  
@@ -241,15 +241,15 @@ task1_output = []
 
 
 task1_output.append('[title top-frequent words in total]')
-for r in word_count_total(news_data, 'title_tokens', n=10):
+for r in word_count_total(news_data, 'title_tokens', n=100):
     task1_output.append(r)
 
 
 # In[20]:
 
 
-task1_output.append('[headline top-frequent words in total]')
-for r in word_count_total(news_data, 'headline_tokens', n=10):
+task1_output.append('\n[headline top-frequent words in total]')
+for r in word_count_total(news_data, 'headline_tokens', n=100):
     task1_output.append(r)
 
 
@@ -258,56 +258,73 @@ for r in word_count_total(news_data, 'headline_tokens', n=10):
 # In[21]:
 
 
+def sort(tokens):
+    take = 100 if len(tokens) >= 100 else len(tokens)
+    return sorted(tokens, key=lambda x: x[1], reverse=True)[:take]
+
+
+# In[22]:
+
+
 def word_count_per(data, column, per_col, take=-1):
+#     rdd = (news_data.select(column, per_col)
+#             .rdd
+#             .flatMap(lambda row: [((row[per_col], w), 1) for w in row[column]])
+#             .reduceByKey(lambda a, b: a + b)
+#             .map(lambda pair: (pair[0][0], (pair[0][1], pair[1])))
+#             .reduceByKey(lambda a, b: a if a[1] > b[1] else b)
+#             .sortBy(lambda w: w[1][1], ascending=False)
+#             )
     rdd = (news_data.select(column, per_col)
-            .rdd
-            .flatMap(lambda row: [((row[per_col], w), 1) for w in row[column]])
-            .reduceByKey(lambda a, b: a + b)
-            .map(lambda pair: (pair[0][0], (pair[0][1], pair[1])))
-            .reduceByKey(lambda a, b: a if a[1] > b[1] else b)
-            .sortBy(lambda w: w[1][1], ascending=False)
-            )
+        .rdd
+        .flatMap(lambda row: [((row[per_col], w), 1) for w in row[column]])
+        .reduceByKey(lambda a, b: a + b)
+        .map(lambda pair: (pair[0][0], (pair[0][1], pair[1])))
+        .groupByKey()
+        .map(lambda topic: (topic[0], sort(topic[1])))
+        .sortBy(lambda w: w[1][1], ascending=False)
+        )
     if take == -1:
         return rdd.collect()
     else:
         return rdd.take(take)
 
 
-# In[22]:
-
-
-task1_output.append('[title top-frequent words per day]')
-for r in word_count_per(news_data, 'title_tokens', 'publishDate', take=60):
-    task1_output.append(r)
-
-
 # In[23]:
 
 
-task1_output.append('[headline top-frequent words per day]')
-for r in word_count_per(news_data, 'headline_tokens', 'publishDate', take=60):
+task1_output.append('\n[title top-frequent words per day]')
+for r in sorted(word_count_per(news_data, 'title_tokens', 'publishDate'), key=lambda x: x[0]):
+    task1_output.append(r)
+
+
+# In[24]:
+
+
+task1_output.append('\n[headline top-frequent words per day]')
+for r in sorted(word_count_per(news_data, 'headline_tokens', 'publishDate'), key=lambda x: x[0]):
     task1_output.append(r)
 
 
 # #### per topic
 
-# In[24]:
+# In[25]:
 
 
-task1_output.append('[title top-frequent words per topic]')
+task1_output.append('\n[title top-frequent words per topic]')
 for r in word_count_per(news_data, 'title_tokens', 'topic'):
     task1_output.append(r)
 
 
-# In[25]:
+# In[26]:
 
 
-task1_output.append('[headline top-frequent words per topic]')
+task1_output.append('\n[headline top-frequent words per topic]')
 for r in word_count_per(news_data, 'headline_tokens', 'topic'):
     task1_output.append(r)
 
 
-# In[26]:
+# In[27]:
 
 
 task1_file.writelines(['{}\n'.format(r) for r in task1_output])
@@ -315,12 +332,6 @@ task1_file.close()
 
 
 # ### In social feedback data, calculate the average popularity of each news by hour, and by day, respectively (for each platform)
-
-# In[27]:
-
-
-fb_social_data = google_social_data = linkedin_social_data = None 
-
 
 # In[28]:
 
@@ -338,24 +349,23 @@ def create_social_data(data, files):
 # In[29]:
 
 
-fb_social_data = create_social_data(fb_social_data, files['fb'])
-google_social_data = create_social_data(google_social_data, files['google'])
-linkedin_social_data = create_social_data(linkedin_social_data, files['linkedin'])
+fb_social_data = google_social_data = linkedin_social_data = None 
 
 
 # In[30]:
 
 
-fb_social_data = fb_social_data.dropna()
-google_social_data = google_social_data.dropna()
-linkedin_social_data = linkedin_social_data.dropna()
+fb_social_data = create_social_data(fb_social_data, files['fb'])
+google_social_data = create_social_data(google_social_data, files['google'])
+linkedin_social_data = create_social_data(linkedin_social_data, files['linkedin'])
 
 
 # In[31]:
 
 
-hour = 3
-day = 72
+fb_social_data = fb_social_data.dropna()
+google_social_data = google_social_data.dropna()
+linkedin_social_data = linkedin_social_data.dropna()
 
 
 # In[32]:
@@ -370,11 +380,6 @@ def get_avg(seq):
 
 
 def avg_popu(data, by=3):
-#     return (data
-#             .rdd
-#             .map(lambda r: (r['IDLink'], 
-#                                  [np.mean(chunk) for chunk in zip(*[iter(r[1:])]*by)]))
-#             .collect())
     return (data
            .rdd
            .map(lambda r: (r['IDLink'],  get_avg(r[1:])))
@@ -450,10 +455,13 @@ task3_output = []
 
 sum_of_score = (news_data.select('SentimentScore', 'topic')
                 .rdd
-                .map(lambda r: (r['topic'], r['SentimentScore']))
-                .groupByKey()
-                .map(lambda topic: (topic[0], list(topic[1])))
-                .map(lambda topic: (topic[0], np.sum(topic[1]), np.mean(topic[1])))
+                .map(lambda r: (r['topic'], (r['SentimentScore'], 1)))
+                .reduceByKey(lambda a, b: (a[0]+b[0], a[1]+b[1]))
+                .map(lambda x: (x[0], x[1][0], (x[1][0]/x[1][1])))
+#                 .groupByKey()
+#                 .map(lambda topic: (topic[0], 
+#                                     np.sum(list(topic[1])), 
+#                                     np.mean(list(topic[1]))))
                 .collect())
 
 
@@ -462,7 +470,7 @@ sum_of_score = (news_data.select('SentimentScore', 'topic')
 
 task3_output.append('[sum sentiment score of each topic]')
 for topic, sum_, avg in sum_of_score:
-    #print('{:>10s}, {:.3f}'.format(*topic_row))
+    print('{:10s}, {:.3f}, {:.6f}'.format(topic, sum_, avg))
     task3_output.append('{:>10s}, {:.3f}'.format(topic, sum_))
 
 
@@ -486,41 +494,25 @@ task3_file.close()
 # In[45]:
 
 
-def top_100(data, column, per_col):
-    return (news_data.select(column, per_col)
-            .rdd
-            .flatMap(lambda row: [((row[per_col], w), 1) for w in row[column]])
-            .reduceByKey(lambda a, b: a + b)
-            .map(lambda pair: (pair[0][0], (pair[0][1], pair[1])))
-            .groupByKey()
-            .map(lambda topic: (topic[0], sorted(topic[1], 
-                                                 key=lambda x: x[1], 
-                                                 reverse=True)[:100]))
-            .map(lambda topic: (topic[0], [w[0] for w in topic[1]]))
-            .collect()
-            )
+fw_all = {'title_tokens':{topic:[w[0] for w in top] 
+                          for topic, top in word_count_per(news_data, 'title_tokens', 'topic')}, 
+         'headline_tokens':{topic:[w[0] for w in top] 
+                          for topic, top in word_count_per(news_data, 'headline_tokens', 'topic')}}
 
 
 # In[46]:
-
-
-fw_all = {'title_tokens':dict(top_100(news_data, 'title_tokens', 'topic')), 
-         'headline_tokens':dict(top_100(news_data, 'headline_tokens', 'topic'))}
-
-
-# In[47]:
 
 
 def counter(vocabulary, tokens):
     return  [int(tokens.count(v) > 0) for v in vocabulary]
 
 
-# In[48]:
+# In[47]:
 
 
 for col_name, v in fw_all.items():
     for topic, vocabulary in v.items():
-        #print('column name:{}, topic:{}'.format(col_name, topic))
+        print('column name:{}, topic:{}'.format(col_name, topic))
         
         X = np.array(news_data.select(col_name, 'topic')
                      .rdd
@@ -528,12 +520,13 @@ for col_name, v in fw_all.items():
                      .map(lambda r:counter(vocabulary, r[col_name]))
                      .collect(), dtype='int64')
         co_occ = X.T.dot(X)
-        np.fill_diagonal(co_occ, 0)
-        (pd.DataFrame(data=co_occ, columns=vocabulary, index=vocabulary)
-         .to_csv('result/task4/{}_{}_matrix.csv'.format(col_name, topic)))
+        # np.fill_diagonal(co_occ, 0)
+        df = pd.DataFrame(data=co_occ, columns=vocabulary, index=vocabulary)
+        # display(df)
+        df.to_csv('result/task4/{}_{}_matrix.csv'.format(col_name, topic))
 
 
-# In[49]:
+# In[48]:
 
 
 print('cost {:.2f} minutes'.format((time.time()-t0)/60))
