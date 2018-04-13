@@ -352,6 +352,7 @@ def create_social_data(data, files):
     for f in files:
         df = read_csv(f)
         data = data.union(df) if data else df
+    data = data.withColumn('IDLink', data['IDLink'].cast('int'))
     for i in range(1, 144+1):
         col_name = 'TS{}'.format(i)
         data = data.withColumn(col_name, data[col_name].cast('int'))
