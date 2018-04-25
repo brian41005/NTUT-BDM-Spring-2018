@@ -117,5 +117,8 @@ venv.bak/
 *.txt
 *.csv
 *.data
+*.sgm
+*.dtd
+*.tar.gz
 .DS_Store
 # End of https://www.gitignore.io/api/python,jupyternotebook,visualstudiocode
